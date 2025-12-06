@@ -1,0 +1,173 @@
+{
+    "widgets": [
+        {
+            "type": "metric",
+            "x": 0,
+            "y": 0,
+            "width": 6,
+            "height": 6,
+            "properties": {
+                "metrics": [
+                    [ "AWS/ECS", "MemoryUtilization", "ServiceName", "temp-fargate-cluster-service", "ClusterName", "temp-fargate-cluster", { "region": "us-east-1" } ]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "us-east-1",
+                "period": 60,
+                "stat": "Average",
+                "title": "ECS MemoryUtilization"
+            }
+        },
+        {
+            "type": "metric",
+            "x": 6,
+            "y": 0,
+            "width": 6,
+            "height": 6,
+            "properties": {
+                "metrics": [
+                    [ "AWS/ECS", "CPUUtilization", "ServiceName", "temp-fargate-cluster-service", "ClusterName", "temp-fargate-cluster", { "region": "us-east-1" } ]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "us-east-1",
+                "period": 60,
+                "stat": "Average",
+                "title": "ECS CPUUtilization",
+                "annotations": {
+                    "horizontal": [
+                        {
+                            "label": "Threshold",
+                            "value": 60
+                        },
+                        {
+                            "visible": false,
+                            "label": "Lower Threshold",
+                            "value": 54
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "type": "metric",
+            "x": 12,
+            "y": 0,
+            "width": 12,
+            "height": 6,
+            "properties": {
+                "metrics": [
+                    [ "AWS/ApplicationELB", "TargetResponseTime", "TargetGroup", "targetgroup/temp-fargate-target-group/131f0f4f08eff6e4", "LoadBalancer", "app/temp-fargate-alb/cfda3311b0dc1f15", { "region": "us-east-1", "stat": "Average", "label": "Average" } ],
+                    [ "...", { "region": "us-east-1", "stat": "p90", "label": "p90" } ],
+                    [ "...", { "region": "us-east-1", "label": "p95" } ],
+                    [ "...", { "region": "us-east-1", "stat": "p99", "label": "p99" } ]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "us-east-1",
+                "stat": "p95",
+                "period": 30,
+                "annotations": {
+                    "horizontal": [
+                        {
+                            "label": "Threshold",
+                            "value": 0.5
+                        }
+                    ]
+                },
+                "legend": {
+                    "position": "bottom"
+                }
+            }
+        },
+        {
+            "type": "metric",
+            "x": 0,
+            "y": 6,
+            "width": 6,
+            "height": 6,
+            "properties": {
+                "metrics": [
+                    [ "AWS/ApplicationELB", "UnHealthyHostCount", "TargetGroup", "targetgroup/temp-fargate-target-group/131f0f4f08eff6e4", "LoadBalancer", "app/temp-fargate-alb/cfda3311b0dc1f15", { "region": "us-east-1" } ],
+                    [ ".", "HealthyHostCount", ".", ".", ".", ".", { "region": "us-east-1" } ]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "us-east-1",
+                "period": 30,
+                "annotations": {
+                    "horizontal": [
+                        {
+                            "label": "Initial",
+                            "value": 1
+                        }
+                    ]
+                },
+                "stat": "Average"
+            }
+        },
+        {
+            "type": "metric",
+            "x": 6,
+            "y": 6,
+            "width": 6,
+            "height": 6,
+            "properties": {
+                "metrics": [
+                    [ "AWS/ApplicationELB", "RequestCount", "LoadBalancer", "app/temp-fargate-alb/cfda3311b0dc1f15", { "region": "us-east-1", "label": "ALB RequestCount", "visible": false } ],
+                    [ ".", "RequestCountPerTarget", "TargetGroup", "targetgroup/temp-fargate-target-group/131f0f4f08eff6e4", { "region": "us-east-1" } ]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "us-east-1",
+                "stat": "Sum",
+                "period": 60,
+                "annotations": {
+                    "horizontal": [
+                        {
+                            "label": "Threshold",
+                            "value": 50
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "type": "metric",
+            "x": 12,
+            "y": 6,
+            "width": 6,
+            "height": 6,
+            "properties": {
+                "metrics": [
+                    [ "AWS/ApplicationELB", "HTTPCode_Target_4XX_Count", "TargetGroup", "targetgroup/temp-fargate-target-group/131f0f4f08eff6e4", "LoadBalancer", "app/temp-fargate-alb/cfda3311b0dc1f15", { "region": "us-east-1" } ],
+                    [ ".", "HTTPCode_Target_2XX_Count", ".", ".", ".", ".", { "region": "us-east-1" } ]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "us-east-1",
+                "stat": "Sum",
+                "period": 60,
+                "title": "HTTP Request Return Code"
+            }
+        },
+        {
+            "type": "alarm",
+            "x": 0,
+            "y": 12,
+            "width": 12,
+            "height": 3,
+            "properties": {
+                "title": "All Alarms",
+                "alarms": [
+                    "arn:aws:cloudwatch:us-east-1:599704543601:alarm:HighLatencyScaleOut",
+                    "arn:aws:cloudwatch:us-east-1:599704543601:alarm:LowLatencyScaleIn",
+                    "arn:aws:cloudwatch:us-east-1:599704543601:alarm:TargetTracking-service/temp-fargate-cluster/temp-fargate-cluster-service-AlarmHigh-7b645590-4023-48f8-a65d-7417e36b6a59",
+                    "arn:aws:cloudwatch:us-east-1:599704543601:alarm:TargetTracking-service/temp-fargate-cluster/temp-fargate-cluster-service-AlarmHigh-c7566aa7-85a2-4b1a-84c0-53b46a18c803",
+                    "arn:aws:cloudwatch:us-east-1:599704543601:alarm:TargetTracking-service/temp-fargate-cluster/temp-fargate-cluster-service-AlarmLow-615c859e-d2eb-413d-9b1e-bbf5d0548f07",
+                    "arn:aws:cloudwatch:us-east-1:599704543601:alarm:TargetTracking-service/temp-fargate-cluster/temp-fargate-cluster-service-AlarmLow-82f750a7-5334-4916-8f8f-8a9955144dbf"
+                ]
+            }
+        }
+    ]
+}
