@@ -17,6 +17,16 @@ The file `run_fargate.sh` uses AWC CLI to automatically set up all the required 
 
 Note that Steps 1-2 (AWS CLI setup and loading image to ECR) only have to be completed once, after which you can begin running the pipeline at Step 3.
 
+This repository uses **Git Large File Storage (LFS)** to store yolo-api_amd64-20251104.tar. To ensure it downloads correctly, please install Git LFS before cloning. 
+
+`macOS`: brew install git-lfs
+`Windows`: [https://git-lfs.com](https://git-lfs.com)
+
+Then run:
+```bash
+   git lfs install
+```
+
 ## Step 1 - Set up AWS CLI credentials
 
 If you haven’t used the AWS CLI on this machine yet, do this first:
