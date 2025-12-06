@@ -19,8 +19,8 @@ Note that Steps 1-2 (AWS CLI setup and loading image to ECR) only have to be com
 
 This repository uses **Git Large File Storage (LFS)** to store yolo-api_amd64-20251104.tar. To ensure it downloads correctly, please install Git LFS before cloning. 
 
-`macOS`: brew install git-lfs
-`Windows`: [https://git-lfs.com](https://git-lfs.com)
+- `macOS`: brew install git-lfs
+- `Windows`: [https://git-lfs.com](https://git-lfs.com)
 
 Then run:
 ```bash
@@ -104,7 +104,7 @@ The image is now available in your local Docker system.
    ```
 You’ll see something like -
 
-    ```bash
+    ```
     REPOSITORY        TAG           IMAGE ID       SIZE
 
     yolo-api     amd64-20251104     abc123...      528MB
