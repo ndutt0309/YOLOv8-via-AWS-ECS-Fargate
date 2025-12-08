@@ -254,3 +254,314 @@ Return to the original terminal from where you ran `run_fargate.sh` and hit 'Ent
 You will have to manually delete your ECR repo.
 
 Verify everything is deleted.
+
+
+
+## Run YOLOv8 using EC2 Baseline
+
+This section explains the **EC2 baseline** used to compare against the AWS pipeline.
+
+Run a **Flask API** directly on one EC2 instance (using Python command in the terminal). On the local machine, the file `client_upload.py` was used to send different traffic patterns (Quiet, Steady, Increasing, High) to this `/predict` endpoint and log the results to CSV files.
+
+The goal is to see how a single EC2 machine behaves under different loads.
+
+---
+
+### Files used (for this baseline)
+
+- `client_upload.py` – client script that sends requests and logs responses into CSV files.
+- `coco_val_manifest.json` – COCO 2017 validation manifest used as the workload.
+- `requirements.txt`
+
+---
+
+> Note: The API is started directly with a small inline Flask script on the EC2 instance.
+
+---
+
+### Step 1 – Launch the EC2 instance
+
+1. In the AWS Console, go to **EC2 → Instances → Launch instances**.
+2. Suggested settings:
+
+   * **Name**: `ec2-baseline`
+   * **AMI**: Amazon Linux 2 (64-bit x86)
+   * **Instance type**: any general-purpose instance with at least 2 vCPUs and 4–8 GiB RAM (for example, `t3.large`).
+3. **Key pair**: create or choose a key pair so you can SSH into the instance.
+4. **Security group**:
+
+   * Allow **SSH (port 22)** from your IP (to log in).
+   * Allow **TCP port 5000** from your IP (this is where the Flask `/predict` endpoint will listen).
+5. Launch the instance and wait until it is in the **Running** state.
+6. Note the **Public IPv4 address** – we’ll refer to this as `<EC2_PUBLIC_IP>`.
+
+---
+
+### Step 2 – Connect to EC2 and install dependencies
+
+From your local machine:
+
+```bash
+ssh -i /path/to/your-key.pem ec2-user@<EC2_PUBLIC_IP>
+```
+
+On the EC2 instance, install basic tools:
+
+```bash
+sudo yum update -y
+sudo yum install -y git python3-pip
+```
+
+(If you are using `requirements.txt`, you can later do `pip3 install -r requirements.txt`.
+For the minimal baseline, we mainly need `flask` and `requests` on the EC2 side.)
+
+Install the Python packages needed for the API:
+
+```bash
+pip3 install flask requests
+```
+
+---
+
+### Step 3 – Make sure CloudWatch agent is running
+
+For the experiments, the EC2 instance should be sending metrics to CloudWatch.
+
+If the **Amazon CloudWatch Agent** has already been installed and configured earlier, you can confirm it is running with:
+
+```bash
+sudo systemctl status amazon-cloudwatch-agent
+```
+
+You should see it in an `active (running)` state.
+(If it is not running, start it with `sudo systemctl start amazon-cloudwatch-agent` after it has been configured.)
+
+---
+
+### Step 4 – Start the inline Flask `/predict` API on EC2
+
+On the EC2 instance, in your terminal, start a very small Flask app inline using:
+
+```bash
+python3 - <<'PY'
+from flask import Flask, request, jsonify
+app = Flask(__name__)
+
+@app.post("/predict")
+def predict():
+    data = request.get_json(force=True, silent=True) or {}
+    # Baseline behavior: echo back whatever JSON we receive
+    return jsonify(ok=True, got=data), 200
+
+app.run(host="0.0.0.0", port=5000)
+PY
+```
+
+Notes:
+
+* This command:
+
+  * Creates a Flask app.
+  * Defines a `POST /predict` endpoint.
+  * Reads the JSON body and echoes it back under `got`.
+  * Listens on `0.0.0.0:5000` so we can reach it from outside the instance.
+* This is a simple baseline: it does not run a model. It is just used as a controlled, lightweight endpoint for load testing with `client_upload.py`.
+
+Keep this terminal window open while running experiments (the server will stop if you close it or hit `Ctrl + C`).
+
+You can quickly test the endpoint from EC2 itself:
+
+```bash
+curl -X POST http://localhost:5000/predict \
+  -H "Content-Type: application/json" \
+  -d '{"req_id": "test-ec2", "hello": "world"}'
+```
+
+You should get a response like:
+
+```json
+{
+  "ok": true,
+  "got": {
+    "req_id": "test-ec2",
+    "hello": "world"
+  }
+}
+```
+
+---
+
+### Step 5 – Prepare the client on your local machine
+
+On your local machine (or any machine that can reach `<EC2_PUBLIC_IP>` on port 5000):
+
+1. Clone this repository and move into it:
+
+   ```bash
+   git clone <THIS_REPO_URL>
+   cd <THIS_REPO_FOLDER>
+   ```
+
+2. Make sure `client_upload.py` and `coco_val_manifest.json` are in this folder.
+
+3. Install the client dependencies (for example):
+
+   ```bash
+   pip install requests pandas python-dotenv
+   ```
+
+4. Export the API URL environment variable so the client knows where to send requests:
+
+   ```bash
+   export API=http://<EC2_PUBLIC_IP>:5000/predict
+   ```
+
+5. (Optional) Confirm the script works:
+
+   ```bash
+   python client_upload.py --help
+   ```
+
+---
+
+### Step 6 – Run the EC2 baseline traffic patterns
+
+All commands below are run **from your local machine**, in the repo folder, with:
+
+* `API` set to `http://<EC2_PUBLIC_IP>:5000/predict`
+* `coco_val_manifest.json` present
+* The Flask server running on EC2 as described above
+
+Each run:
+
+* Reads image metadata from `coco_val_manifest.json`.
+* Sends HTTP POST requests to `$API`.
+* Logs responses (including latency) to a CSV file.
+* Uses `--tag` to label the scenario.
+
+#### 6.1 Quiet load
+
+Low, sparse traffic to simulate a quiet period:
+
+```bash
+python client_upload.py \
+  --mode quiet --api "$API" \
+  --manifest coco_val_manifest.json \
+  --limit 300 --rps 0.25 \
+  --csv quiet_ec2.csv --tag quiet-ec2
+```
+
+* `limit = 300` → total number of requests.
+* `rps = 0.25` → around 1 request every 4 seconds.
+
+---
+
+#### 6.2 Steady load
+
+Constant moderate traffic. Run it twice to get two comparable samples.
+
+```bash
+# Steady run 1
+python client_upload.py \
+  --mode sustained --api "$API" \
+  --manifest coco_val_manifest.json \
+  --limit 3000 --rps 3 \
+  --csv steady_ec2.csv --tag steady-ec2
+
+# Steady run 2
+python client_upload.py \
+  --mode sustained --api "$API" \
+  --manifest coco_val_manifest.json \
+  --limit 3000 --rps 3 \
+  --csv steady_ec3.csv --tag steady-ec3
+```
+
+---
+
+#### 6.3 Increasing load
+
+Start with sustained load, then add bursts separated by short pauses.
+
+```bash
+# Sustained phase 1
+python client_upload.py --mode sustained --api "$API" \
+  --manifest coco_val_manifest.json --limit 1500 --rps 3 \
+  --csv inc1_ec2.csv --tag inc1-ec2
+
+# Sustained phase 2
+python client_upload.py --mode sustained --api "$API" \
+  --manifest coco_val_manifest.json --limit 1500 --rps 3 \
+  --csv inc2_ec2.csv --tag inc2-ec2
+
+# Burst phases
+sleep 120
+python client_upload.py --mode burst --api "$API" \
+  --manifest coco_val_manifest.json --limit 500 --rps 14 --burst-size 500 \
+  --csv incb1_ec2.csv --tag incb1-ec2
+
+sleep 60
+python client_upload.py --mode burst --api "$API" \
+  --manifest coco_val_manifest.json --limit 1000 --rps 14 --burst-size 1000 \
+  --csv incb2_ec2.csv --tag incb2-ec2
+
+sleep 30
+python client_upload.py --mode burst --api "$API" \
+  --manifest coco_val_manifest.json --limit 500 --rps 14 --burst-size 500 \
+  --csv incb3_ec2.csv --tag incb3-ec2
+```
+
+---
+
+#### 6.4 High load
+
+Keeps the instance busy for longer with a mix of sustained and bursty traffic:
+
+```bash
+# High sustained phases
+python client_upload.py --mode sustained --api "$API" \
+  --manifest coco_val_manifest.json --limit 1500 --rps 3 \
+  --csv high1_ec2.csv --tag high1-ec2
+
+python client_upload.py --mode sustained --api "$API" \
+  --manifest coco_val_manifest.json --limit 1500 --rps 3 \
+  --csv high2_ec2.csv --tag high2-ec2
+
+# High burst phases
+sleep 120
+python client_upload.py --mode burst --api "$API" \
+  --manifest coco_val_manifest.json --limit 1000 --rps 14 --burst-size 1000 \
+  --csv highb1_ec2.csv --tag highb1-ec2
+
+sleep 120
+python client_upload.py --mode burst --api "$API" \
+  --manifest coco_val_manifest.json --limit 1000 --rps 14 --burst-size 1000 \
+  --csv highb2_ec2.csv --tag highb2-ec2
+
+sleep 45
+python client_upload.py --mode burst --api "$API" \
+  --manifest coco_val_manifest.json --limit 500 --rps 14 --burst-size 500 \
+  --csv highb3_ec2.csv --tag highb3-ec2
+
+sleep 60
+python client_upload.py --mode burst --api "$API" \
+  --manifest coco_val_manifest.json --limit 500 --rps 14 --burst-size 500 \
+  --csv highb4_ec2.csv --tag highb4-ec2
+
+sleep 165
+python client_upload.py --mode burst --api "$API" \
+  --manifest coco_val_manifest.json --limit 1000 --rps 14 --burst-size 500 \
+  --csv highb5_ec2.csv --tag highb5-ec2
+```
+
+All of these runs generate the `*_ec2.csv` files that are use to compute metrics like p90/p95/p99 latency and error rates for the EC2 baseline, which are also shown on the terminal.
+
+---
+
+### Step 7 – Stop the baseline
+
+When you are done:
+
+1. On EC2, stop the Flask server by pressing `Ctrl + C` in the terminal where the inline `python3 - <<'PY'` command is running.
+2. In the AWS Console, **stop or terminate** the EC2 instance so it does not keep running and generating charges.
+
+
