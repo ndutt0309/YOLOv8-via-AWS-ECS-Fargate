@@ -19,6 +19,8 @@ Note that Steps 1-2 (AWS CLI setup and loading image to ECR) only have to be com
 
 This repository uses **Git Large File Storage (LFS)** to store yolo-api_amd64-20251104.tar. To ensure it downloads correctly, please install Git LFS before cloning. 
 
+If Git LFS is not installed, the file may appear as a small pointer file after cloning. In this case, download the tar file separately (≈ 558 MB) using this link (https://drive.google.com/drive/folders/16KduWvdqoBbY8HDFhBqgTvzbuIKCZRF-?usp=sharing) and replace the pointer file in the repository directory before continuing.
+
 - `macOS`: brew install git-lfs
 - `Windows`: [https://git-lfs.com](https://git-lfs.com)
 
@@ -49,6 +51,8 @@ If you haven’t used the AWS CLI on this machine yet, do this first:
    Default region name [None]: us-east-1
    Default output format [None]: json
    ```
+### Important Region Requirement:
+Make sure the AWS Console region is set to N. Virginia (us-east-1) when logging in with the IAM user. All resources (ECS, ALB, CloudWatch dashboard, and alarms) are created in us-east-1, and they will not be visible in other regions.
 
 3. Verify your CLI is connected to your account:
    ```bash
@@ -107,7 +111,7 @@ You’ll see something like -
     ```
     REPOSITORY        TAG           IMAGE ID       SIZE
 
-    yolo-api     amd64-20251104     abc123...      528MB
+    yolo-api     amd64-20251104     abc123...      558MB
     ```
 
 ## Step 3 - Run the AWS pipeline
@@ -179,15 +183,18 @@ You’ll get a JSON response with the detection and timing for the specified ima
 
 ## Step 4 - Submitting multiple requests simulataneously
 
-1. Navigate to '/live_request'.
-
-2. Install requirements.
+1. From the root directory of the repository, install Python dependencies:
 
  ```bash
    pip install -r requirements.txt
 ```
+2. Then navigate to the live request directory:
+   
+ ```bash
+  cd live_request
+```
 
-3. Create a `.env` file with the following variable
+4. Create a `.env` file with the following variable
 
 ```
 API_BASE_URL=http://temp-fargate-alb-27906923.us-east-1.elb.amazonaws.com:8080
